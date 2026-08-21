@@ -47,10 +47,10 @@ def get_explanation(prob, asa, motion, prior, bellville, surgery_type):
 def load_artifacts():
     model = None
     meta = None
-    if os.path.exists("models/ponv_model.pkl"):
-        model = joblib.load("models/ponv_model.pkl")
-    if os.path.exists("models/ponv_meta.pkl"):
-        meta = joblib.load("models/ponv_meta.pkl")
+    if os.path.exists("ponv_model.pkl"):
+        model = joblib.load("ponv_model.pkl")
+    if os.path.exists("ponv_meta.pkl"):
+        meta = joblib.load("ponv_meta.pkl")
     return model, meta
 
 
@@ -61,7 +61,7 @@ st.markdown("**48-hour Post-Operative Nausea & Vomiting Risk Assessment**")
 model, meta = load_artifacts()
 
 if model is None:
-    st.warning("⚠️ No trained model found. Please ensure ponv_model.pkl is in the models/ directory.")
+    st.warning("⚠️ No trained model found (ponv_model.pkl). Use `train_model.py` to create one.")
     st.stop()
 
 # Show disclaimer and metadata
