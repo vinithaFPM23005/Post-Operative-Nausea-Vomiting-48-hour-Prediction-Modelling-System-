@@ -17,7 +17,14 @@ from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from sklearn.compose import ColumnTransformer
 from sklearn.impute import SimpleImputer
 from sklearn.calibration import CalibratedClassifierCV
-from sklearn.metrics import roc_auc_score, roc_curve, accuracy_score, precision_score, recall_score
+from sklearn.metrics import (
+    accuracy_score,
+    confusion_matrix,
+    precision_score,
+    recall_score,
+    roc_auc_score,
+    roc_curve,
+)
 
 try:
     import xgboost as xgb
@@ -34,9 +41,12 @@ def load_data(path):
 
 def find_col(df, candidates):
     """Find column by flexible name matching."""
+    normalized = {str(column).strip().lower(): column for column in df.columns}
     for c in candidates:
         if c in df.columns:
             return c
+        if str(c).strip().lower() in normalized:
+            return normalized[str(c).strip().lower()]
     return None
 
 
@@ -98,13 +108,14 @@ def main(data_path="data/raw/Data_1500.xlsx", model_type="auto"):
 
     df = load_data(p)
     
-    if "PONV_48h" not in df.columns:
+    col_target = find_col(df, ["PONV_48h", "ponv_48h"])
+    if not col_target:
         raise ValueError("Expected target column 'PONV_48h' in dataset")
 
     # Flexible column detection
     col_age = find_col(df, ["age", "Age"])
     col_bmi = find_col(df, ["BMI", "bmi"])
-    col_bell = find_col(df, ["bellville_score", "Bellville", "bellville", "BellvilleScore"])
+    col_sex = find_col(df, ["sex", "gender", "female", "patient_sex"])
     col_surg = find_col(df, ["surgery_type", "surgery", "SurgeryType"])
     col_anes = find_col(df, ["anaesthesia_type", "anaesthesia", "anaesthesia_administered"])
     col_motion = find_col(df, ["motion_sickness", "MotionSickness", "motionSickness"])
@@ -118,9 +129,10 @@ def main(data_path="data/raw/Data_1500.xlsx", model_type="auto"):
         if found:
             drug_cols.append(found)
 
-    numeric_cols = [c for c in [col_age, col_bmi, col_bell] if c]
-    categorical_cols = [c for c in [col_surg, col_anes, col_asa] if c]
+    base_numeric_cols = [c for c in [col_age, col_bmi] if c]
+    categorical_cols = [c for c in [col_surg, col_anes, col_asa, col_sex] if c]
     bool_cols = [c for c in [col_motion, col_prior_ponv, col_prior_surg] if c]
+    numeric_cols = base_numeric_cols + drug_cols + bool_cols
 
     features = numeric_cols + categorical_cols + drug_cols + bool_cols
 
@@ -128,7 +140,7 @@ def main(data_path="data/raw/Data_1500.xlsx", model_type="auto"):
         raise ValueError("No feature columns found in dataset.")
 
     X = df[features].copy()
-    y = df["PONV_48h"].astype(int)
+    y = df[col_target].astype(int)
 
     # Map ASA textual to numeric
     if col_asa and col_asa in X.columns:
@@ -160,11 +172,19 @@ def main(data_path="data/raw/Data_1500.xlsx", model_type="auto"):
             prec = precision_score(y_test, calib.predict(X_test), zero_division=0)
             rec = recall_score(y_test, calib.predict(X_test), zero_division=0)
 
+            matrix = confusion_matrix(y_test, calib.predict(X_test), labels=[0, 1])
+            fpr, tpr, thresholds = roc_curve(y_test, prob)
             results[mt] = {
                 "auc": float(auc),
                 "accuracy": float(acc),
                 "precision": float(prec),
                 "recall": float(rec),
+                "confusion_matrix": matrix.tolist(),
+                "roc_curve": {
+                    "fpr": fpr.tolist(),
+                    "tpr": tpr.tolist(),
+                    "thresholds": thresholds.tolist(),
+                },
             }
             print(f"  AUC: {auc:.3f}, Acc: {acc:.3f}, Prec: {prec:.3f}, Rec: {rec:.3f}")
 
@@ -195,12 +215,58 @@ def main(data_path="data/raw/Data_1500.xlsx", model_type="auto"):
             thresholds_by_asa[int(asa_val)] = float(th[opt_idx])
 
     # Save artifacts
+    target_counts = y.value_counts().sort_index()
+    descriptive = {}
+    for column in base_numeric_cols:
+        descriptive[column] = {
+            "count": int(df[column].notna().sum()),
+            "mean": float(df[column].mean()),
+            "median": float(df[column].median()),
+            "std": float(df[column].std()),
+            "min": float(df[column].min()),
+            "max": float(df[column].max()),
+        }
+
+    feature_importance = {}
+    try:
+        fitted_pipeline = best_model.calibrated_classifiers_[0].estimator
+        preprocessor = fitted_pipeline.named_steps["pre"]
+        classifier = fitted_pipeline.named_steps["clf"]
+        names = preprocessor.get_feature_names_out()
+        values = getattr(classifier, "coef_", None)
+        if values is None:
+            values = getattr(classifier, "feature_importances_", None)
+        if values is not None:
+            values = np.asarray(values).ravel()
+            feature_importance = {
+                str(name): float(value)
+                for name, value in sorted(
+                    zip(names, values), key=lambda item: abs(item[1]), reverse=True
+                )[:15]
+            }
+    except Exception:
+        feature_importance = {}
+
     meta = {
+        "dataset": {
+            "rows": int(len(df)),
+            "columns": int(df.shape[1]),
+            "positive_cases": int(target_counts.get(1, 0)),
+            "negative_cases": int(target_counts.get(0, 0)),
+            "prevalence": float(y.mean()),
+            "missing_cells": int(df.isna().sum().sum()),
+            "descriptive_statistics": descriptive,
+        },
         "best_model_type": best_model_type,
         "model_results": results,
+        "feature_importance": feature_importance,
         "surgery_types": list(df[col_surg].dropna().unique()) if col_surg else [],
         "anaesthesia_types": list(df[col_anes].dropna().unique()) if col_anes else [],
         "features": features,
+        "excluded_features": {
+            "bellville": "Excluded because the dossier identifies it as possible post-event outcome leakage.",
+            "ondansetron": "Retained only when present, but interpret cautiously because of confounding by indication.",
+        },
         "thresholds_by_asa": thresholds_by_asa,
         "disclaimer": (
             "This PONV predictor is a decision-support prototype. It is NOT a validated clinical tool. "

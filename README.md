@@ -25,7 +25,6 @@ The PONV Risk Predictor integrates clinical data (ASA score, surgery type, patie
 ### ⚠️ Disclaimer
 **This tool is a PROTOTYPE for research/education only.** It is NOT a validated clinical tool and should NOT be used as the sole basis for clinical decisions. External validation and regulatory approvals required before clinical deployment.
 
----
 
 ## 🚀 Quick Start
 
@@ -43,11 +42,11 @@ source venv/bin/activate          # Windows: venv\Scripts\activate
 # Install dependencies
 pip install -r requirements.txt
 
-# Train model
-python src/train.py data/raw/Data_1500.xlsx
+# Train all five models and persist dashboard analytics
+python train.py data/raw/Data_1500.xlsx
 
 # Run dashboard
-streamlit run src/app.py
+streamlit run app.py
 ```
 
 Dashboard opens at **http://localhost:8501**
@@ -83,9 +82,8 @@ Access at **http://localhost** (nginx proxy) or **http://localhost:8501** (direc
 
 ```
 ponv-risk-predictor/
-├── src/
-│   ├── app.py                 # Streamlit dashboard
-│   └── train.py               # Training pipeline
+├── app.py                     # Streamlit dashboard
+├── train.py                   # Training pipeline
 ├── models/                    # Trained models (auto-generated)
 │   ├── ponv_model.pkl         # Best model artifact
 │   └── ponv_meta.pkl          # Metadata & thresholds
@@ -293,7 +291,6 @@ This software is provided **AS-IS** for research and educational purposes only. 
 - A validated clinical tool
 - FDA-approved or CE-marked
 - A replacement for clinical judgment
-- Suitable for regulatory/compliance use without external validation
 
 **Before clinical deployment:**
 1. Perform external validation on independent cohorts
@@ -302,7 +299,8 @@ This software is provided **AS-IS** for research and educational purposes only. 
 4. Ensure HIPAA/GDPR compliance
 5. Train clinical staff on correct usage
 
----
+  # Retrain
+  python train.py data/raw/Data_1500.xlsx
 
 ## 💬 Support & Issues
 
@@ -310,6 +308,8 @@ This software is provided **AS-IS** for research and educational purposes only. 
 - **Discussions**: [GitHub Discussions](https://github.com/yourusername/ponv-risk-predictor/discussions)
 - **Email**: support@yourorganization.com
 
+
+  After deploying the Streamlit service, set `PONV_APP_URL` to its HTTPS URL and restart the app. The dashboard will show an **Open deployed predictor** link. Google Play and Chrome Web Store publication are separate packaging, signing, and account workflows; this repository provides the browser app and deployment configuration but cannot create a store listing by itself.
 ---
 
 ## 🙏 Acknowledgments
