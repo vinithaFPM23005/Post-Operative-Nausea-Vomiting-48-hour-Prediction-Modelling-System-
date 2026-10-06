@@ -1,5 +1,5 @@
 # Post-Operative-Nausea-Vomiting-48-hour-Prediction-Modelling-System-
-A comprehensive predictive analysis of Post-Operative Nausea &amp; Vomiting (PONV) within 48 hours of surgery. A predictor analytical tool was developed, trained, and evaluated on 1,500 patient records using five different algorithms: Logistic Regression, Random Forest, Decision Tree, Gradient Boosting 
+A comprehensive predictive analysis of Post-Operative Nausea &amp; Vomiting (PONV) within 48 hours of surgery. A predictor analytical tool was developed, trained, and evaluated on 1,750 patient records using five different algorithms: Logistic Regression, Random Forest, Decision Tree, Gradient Boosting 
 # PONV Risk Predictor 🏥
 
 A **production-ready Streamlit dashboard** for predicting Post-Operative Nausea & Vomiting (PONV) within 48 hours of surgery using machine learning.
@@ -8,12 +8,16 @@ A **production-ready Streamlit dashboard** for predicting Post-Operative Nausea 
 [![Streamlit](https://img.shields.io/badge/streamlit-1.28+-red.svg)](https://streamlit.io/)
 [![Docker](https://img.shields.io/badge/docker-ready-brightgreen.svg)](Dockerfile)
 
-## 📋 Overview
+## � Datasets
+- [DATASET_1500.md](DATASET_1500.md) — original 1,500 records
+- [DATASET_1750.md](DATASET_1750.md) — extended 1,750 records (1,500 + 250), default for training
+
+## �📋 Overview
 The PONV Risk Predictor integrates clinical data (ASA score, surgery type, patient factors, anesthesia, drugs) into a multi-model ML pipeline that predicts PONV probability with color-coded risk tiers and actionable clinical alerts.
 
 ### Key Features
 - ✅ **5 ML Algorithms**: Logistic Regression, Random Forest, Decision Tree, Gradient Boosting, XGBoost
-- ✅ **Auto-Model Selection**: Trains all models, picks best performer on validation AUC
+- ✅ **Auto-Model Selection**: Trains all models, picks best performer on 5-fold CV AUC
 - ✅ **Color-Coded Risk Tiers**: 🟢 LOW / 🟡 MODERATE / 🔴 HIGH / ⛔ VERY HIGH
 - ✅ **Plain-Language Explanations**: Clinician-friendly risk factor summaries
 - ✅ **Per-ASA Thresholds**: Optimized decision boundaries for each ASA severity grade
@@ -38,7 +42,7 @@ source venv/bin/activate        # On Windows: venv\Scripts\activate
 pip install -r requirements.txt
 
 # Train the model on your dataset
-python train_model.py path/to/Data_1500.xlsx
+python train.py data/Data_1750.xlsx
 
 # Launch the Streamlit app
 streamlit run app.py
@@ -60,7 +64,7 @@ Access at **http://localhost:8501**
 ### Training on Your Dataset
 
 ```bash
-python train_model.py path/to/Data_1500.xlsx
+python train.py data/Data_1750.xlsx
 ```
 
 **Expected output:**
@@ -90,23 +94,17 @@ The script auto-detects column names with flexible aliases:
 The training script automatically:
 1. **Trains** all 5 model types (Logistic, RF, DT, GB, XGBoost)
 2. **Evaluates** each on held-out test set (20% split)
-3. **Selects** the best-performing model (highest AUC)
+3. **Selects** the best-performing model (highest cross-validated AUC)
 4. **Calibrates** predictions using Sigmoid scaling
 5. **Computes** per-ASA optimal thresholds (Youden's J index)
 6. **Saves** comparison table in metadata for dashboard display
 
-**Example output:**
+**Example output (`python train.py`, Data_1750.xlsx):**
 ```
---- Training LOGISTIC ---
-  AUC: 0.661, Acc: 0.667, Prec: 0.232, Rec: 0.588
+--- Training GB ---
+  CV AUC: 0.622, Holdout AUC: 0.616, thr=0.209, Acc: 0.557, Prec: 0.218, Rec: 0.507
 
---- Training RF ---
-  AUC: 0.685, Acc: 0.680, Prec: 0.248, Rec: 0.580
-
---- Training XGB ---
-  AUC: 0.702, Acc: 0.695, Prec: 0.263, Rec: 0.592
-
-✓ Best model: XGB (AUC=0.702)
+✓ Best model: GB (5-fold CV AUC=0.622)
 ✓ Saved ponv_model.pkl and ponv_meta.pkl
 ```
 ### 3. **Docker Compose (with Nginx)**
@@ -122,6 +120,13 @@ docker-compose down
 ```
 
 Access at **http://localhost** (nginx proxy) or **http://localhost:8501** (direct)
+
+---
+## 📱 Mobile Access with ngrok (Google Chrome)
+
+1. Install ngrok and add your token (from https://dashboard.ngrok.com): `ngrok config add-authtoken <TOKEN>`
+2. Run `./run_ngrok.sh` (starts Streamlit on port 8501 and `ngrok http 8501`).
+3. Copy the `https://xxxx.ngrok-free.app` URL shown by ngrok and open it in Chrome on your phone (click "Visit Site" on the ngrok notice page).
 
 ---
 ## 🏥 Using the Dashboard
@@ -214,15 +219,15 @@ ponv-risk-predictor/
 
 ---
 ## 📊 Model Performance
-Trained on synthetic/provided dataset (n=1,500):
-| Model | AUC | Accuracy | Precision | Recall |
-|-------|-----|----------|-----------|--------|
-| **Logistic Regression** ⭐ | **0.661** | 0.747 | 0.000 | 0.000 |
-| Random Forest | 0.555 | 0.747 | 0.000 | 0.000 |
-| Decision Tree | 0.509 | 0.747 | 0.000 | 0.000 |
-| Gradient Boosting | 0.570 | 0.747 | 0.000 | 0.000 |
-| XGBoost | 0.546 | 0.747 | 0.000 | 0.000 |
-**Note**: Synthetic data used for testing. Real dataset yields different/better AUC.
+Trained on the provided dataset (n=1,750; 80/20 stratified holdout + 5-fold CV; Bellville score excluded to avoid outcome leakage; Youden threshold from training data):
+| Model | CV AUC | Holdout AUC | Accuracy | Precision | Recall |
+|-------|--------|-------------|----------|-----------|--------|
+| Logistic Regression | 0.598 | 0.578 | 0.563 | 0.235 | 0.567 |
+| Random Forest | 0.606 | 0.610 | 0.643 | 0.241 | 0.403 |
+| Decision Tree | 0.574 | 0.613 | 0.543 | 0.240 | 0.642 |
+| **Gradient Boosting** ⭐ | **0.622** | 0.616 | 0.557 | 0.218 | 0.507 |
+
+**Note**: Discrimination is modest (AUC ~0.6); outputs are probabilities for research use, not diagnoses.
 ---
 ## 🧮 Models Supported
 
@@ -248,11 +253,11 @@ Trained on synthetic/provided dataset (n=1,500):
 ---
 ## 📈 Performance
 
-**Current Dataset (Data_1500.xlsx):**
-- **Held-out AUC:** ~0.66–0.70 (varies by model)
+**Current Dataset (Data_1750.xlsx):**
+- **Held-out AUC:** ~0.58–0.62 (varies by model)
 - **PONV Prevalence:** ~19% (realistic imbalance)
-- **Sample Size:** 1,500 patients
-- **Test Set:** 20% (300 patients)
+- **Sample Size:** 1,750 patients
+- **Test Set:** 20% (350 patients)
 
 **Recommendations:**
 - Collect more data (>5,000 patients) for production robustness
@@ -273,10 +278,10 @@ python train_model.py path/to/updated_data.xlsx
 
 ```bash
 # Place your Excel file in data/raw/
-cp /path/to/your_data.xlsx data/raw/Data_1500.xlsx
+cp /path/to/your_data.xlsx data/Data_1750.xlsx
 
 # Retrain
-python src/train.py data/raw/Data_1500.xlsx
+python train.py data/Data_1750.xlsx
 
 # Expected output:
 # ✓ Best model: LOGISTIC (AUC=0.XXX)
@@ -376,7 +381,7 @@ import streamlit_authenticator as stauth
 pytest tests/
 
 # Manual smoke test
-python src/train.py data/raw/Data_1500.xlsx
+python train.py data/Data_1750.xlsx
 streamlit run src/app.py --logger.level=debug
 ```
 
