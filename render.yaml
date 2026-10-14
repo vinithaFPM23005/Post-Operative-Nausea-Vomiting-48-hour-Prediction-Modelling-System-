@@ -1,0 +1,6 @@
+services:
+  - type: web
+    name: ponv-risk-predictor
+    runtime: docker
+    plan: starter
+    healthCheckPath: /_stcore/health

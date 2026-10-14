@@ -148,8 +148,13 @@ def evaluate(frame, features, model):
 
 
 st.set_page_config(page_title="PONV Risk Predictor", page_icon="+", layout="wide")
-st.title("PONV Risk Predictor")
-st.caption("Research decision-support dashboard for 48-hour post-operative nausea and vomiting")
+logo_left, title_col, logo_right = st.columns([1, 4, 1], vertical_alignment="center")
+for column, logo_file in ((logo_left, "assets left_logo.jpeg"), (logo_right, "assets _right_logo.jpeg")):
+    if Path(logo_file).exists():
+        column.image(logo_file, use_container_width=True)
+with title_col:
+    st.title("PONV Risk Predictor")
+    st.caption("Research decision-support dashboard for 48-hour post-operative nausea and vomiting")
 st.warning(
     "For research and audit use only. This model is not a diagnosis or a substitute for the anesthesiologist's clinical judgment."
 )
